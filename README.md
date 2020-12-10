@@ -2,6 +2,6 @@
 
 Hi all!
 
-May Name is Henryk and this is my first expirience with GitHub.
+My name is Henryk and this is my first expirience with GitHub.
 
 Wish me luck ;)
