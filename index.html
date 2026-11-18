@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Break-Even-Rechner · Produktentwicklung</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171e2e;
+    --panel-2: #1d2638;
+    --border: #2a3550;
+    --text: #e8edf7;
+    --muted: #93a0b8;
+    --accent: #4f8cff;
+    --accent-2: #7c5cff;
+    --good: #2fbf71;
+    --warn: #f5a524;
+    --bad: #e5484d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+    line-height: 1.45;
+  }
+  header { margin-bottom: 20px; }
+  header h1 { font-size: 1.5rem; font-weight: 700; }
+  header p { color: var(--muted); font-size: .92rem; margin-top: 4px; }
+
+  .grid-inputs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .card h2 {
+    font-size: .95rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2 .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent);
+    flex: none;
+  }
+  .card:nth-child(2) h2 .dot { background: var(--accent-2); }
+  .card:nth-child(3) h2 .dot { background: var(--warn); }
+  .card:nth-child(4) h2 .dot { background: var(--good); }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 130px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .row label { font-size: .85rem; color: var(--muted); }
+  .row input {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: .9rem;
+    text-align: right;
+  }
+  .row input:focus { outline: none; border-color: var(--accent); }
+  .row .suffix { position: relative; }
+  .row .suffix::after {
+    content: attr(data-suffix);
+    position: absolute;
+    right: 10px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: .75rem;
+    pointer-events: none;
+  }
+  .row .suffix input { padding-right: 42px; }
+  .subtotal {
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px dashed var(--border);
+    margin-top: 10px;
+    padding-top: 10px;
+    font-size: .88rem;
+    font-weight: 600;
+  }
+  .subtotal span:last-child { color: var(--accent); }
+
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .kpi .label {
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .kpi .value { font-size: 1.35rem; font-weight: 700; }
+  .kpi .hint { font-size: .75rem; color: var(--muted); margin-top: 4px; }
+  .kpi.pos .value { color: var(--good); }
+  .kpi.neg .value { color: var(--bad); }
+  .kpi.warn .value { color: var(--warn); }
+
+  .charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .chart-card canvas { width: 100%; height: 320px; display: block; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .85rem;
+  }
+  th, td {
+    padding: 8px 10px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  th:first-child, td:first-child { text-align: left; }
+  th {
+    color: var(--muted);
+    font-weight: 600;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  td.pos { color: var(--good); }
+  td.neg { color: var(--bad); }
+  tr.highlight td { background: rgba(79, 140, 255, .08); font-weight: 600; }
+
+  .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  button {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: .85rem;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .section-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 4px 0 12px;
+  }
+  .warning {
+    background: rgba(229, 72, 77, .12);
+    border: 1px solid var(--bad);
+    color: var(--bad);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: .88rem;
+    display: none;
+  }
+  .footnote { color: var(--muted); font-size: .78rem; margin-top: 14px; }
+
+  @media print {
+    body { background: #fff; color: #000; padding: 0; }
+    .card, .kpi, .chart-card { background: #fff; border-color: #ccc; }
+    .toolbar { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Break-Even-Rechner · Produktentwicklung</h1>
+  <p>Amortisation der Entwicklung, Break-Even-Menge, Deckungsbeiträge und Mehrjahresplanung. Alle Beträge netto (ohne USt.).</p>
+</header>
+
+<div class="warning" id="warning"></div>
+
+<div class="grid-inputs">
+  <div class="card">
+    <h2><span class="dot"></span>Einmalige Entwicklungskosten</h2>
+    <div class="row"><label>Entwicklung &amp; Konstruktion</label><input type="number" min="0" step="1000" id="devEng" value="250000"></div>
+    <div class="row"><label>Prototypen &amp; Muster</label><input type="number" min="0" step="1000" id="devProto" value="40000"></div>
+    <div class="row"><label>Testing &amp; Zertifizierung</label><input type="number" min="0" step="1000" id="devCert" value="30000"></div>
+    <div class="row"><label>Werkzeuge &amp; Tooling</label><input type="number" min="0" step="1000" id="devTooling" value="80000"></div>
+    <div class="row"><label>Launch-Marketing</label><input type="number" min="0" step="1000" id="devMarketing" value="50000"></div>
+    <div class="subtotal"><span>Summe einmalig</span><span id="sumDev">–</span></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>Variable Stückkosten</h2>
+    <div class="row"><label>Material &amp; Komponenten</label><input type="number" min="0" step="0.5" id="varMaterial" value="38"></div>
+    <div class="row"><label>Fertigung / Lohn</label><input type="number" min="0" step="0.5" id="varLabor" value="14"></div>
+    <div class="row"><label>Montage</label><input type="number" min="0" step="0.5" id="varAssembly" value="6"></div>
+    <div class="row"><label>Verpackung</label><input type="number" min="0" step="0.5" id="varPackaging" value="2.5"></div>
+    <div class="row"><label>Versand &amp; Logistik</label><input type="number" min="0" step="0.5" id="varLogistics" value="4.5"></div>
+    <div class="row"><label>Qualität &amp; Sonstiges</label><input type="number" min="0" step="0.5" id="varOther" value="2"></div>
+    <div class="subtotal"><span>Summe pro Stück</span><span id="sumVar">–</span></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>Fixe Kosten pro Jahr</h2>
+    <div class="row"><label>Personal (Fertigung &amp; Vertrieb)</label><input type="number" min="0" step="1000" id="fixPersonnel" value="180000"></div>
+    <div class="row"><label>Miete &amp; Infrastruktur</label><input type="number" min="0" step="1000" id="fixRent" value="60000"></div>
+    <div class="row"><label>Maschinen &amp; Abschreibungen</label><input type="number" min="0" step="1000" id="fixDepreciation" value="40000"></div>
+    <div class="row"><label>Verwaltung</label><input type="number" min="0" step="1000" id="fixAdmin" value="70000"></div>
+    <div class="row"><label>Laufendes Marketing</label><input type="number" min="0" step="1000" id="fixMarketing" value="30000"></div>
+    <div class="row"><label>Sonstiges</label><input type="number" min="0" step="1000" id="fixOther" value="20000"></div>
+    <div class="subtotal"><span>Summe pro Jahr</span><span id="sumFix">–</span></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>Preis &amp; Absatz</h2>
+    <div class="row"><label>Verkaufspreis netto / Stück</label><input type="number" min="0" step="1" id="price" value="149"></div>
+    <div class="row"><label>Verkaufsmenge Jahr 1</label><input type="number" min="0" step="100" id="volume1" value="6000"></div>
+    <div class="row"><label>Absatzwachstum p. a.</label><div class="suffix" data-suffix="%"><input type="number" step="1" id="growth" value="15"></div></div>
+    <div class="row"><label>Preisänderung p. a.</label><div class="suffix" data-suffix="%"><input type="number" step="1" id="priceDrift" value="0"></div></div>
+    <div class="row"><label>Inflation variable Kosten p. a.</label><div class="suffix" data-suffix="%"><input type="number" step="1" id="costInflation" value="2"></div></div>
+    <div class="row"><label>Planungshorizont</label><div class="suffix" data-suffix="J."><input type="number" min="1" max="15" step="1" id="years" value="5"></div></div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <button class="primary" id="btnExport">CSV-Export (Mehrjahresplan)</button>
+  <button id="btnPrint">Drucken / PDF</button>
+</div>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="charts">
+  <div class="card chart-card">
+    <h2><span class="dot"></span>Break-Even-Analyse (Jahr 1)</h2>
+    <canvas id="chartBE"></canvas>
+  </div>
+  <div class="card chart-card">
+    <h2><span class="dot"></span>Kumulierter Cashflow inkl. Entwicklung</h2>
+    <canvas id="chartCash"></canvas>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="section-title">Mehrjahresplanung</div>
+  <div style="overflow-x:auto;">
+    <table id="tableYears"></table>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="section-title">Sensitivität: Break-Even-Menge (Stück/Jahr)</div>
+  <div style="overflow-x:auto;">
+    <table id="tableSens"></table>
+  </div>
+  <div class="footnote">Zeilen: variable Stückkosten (−10 % bis +10 %) · Spalten: Verkaufspreis (−10 % bis +10 %) gegenüber den Planwerten.</div>
+</div>
+
+<div class="footnote">
+  Formeln: Deckungsbeitrag/Stück = Preis − variable Stückkosten · BEP<sub>Menge</sub> = Fixkosten/Jahr ÷ DB/Stück ·
+  BEP<sub>Umsatz</sub> = BEP<sub>Menge</sub> × Preis · Cash-Break-Even nutzt Fixkosten ohne Abschreibungen ·
+  Amortisation = Jahr, in dem der kumulierte Cashflow die Entwicklungskosten ausgeglichen hat (interpoliert).
+</div>
+
+<script>
+"use strict";
+
+const eur = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const eur2 = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 2 });
+const n = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
+const n1 = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 });
+
+const $ = (id) => document.getElementById(id);
+
+function num(id) {
+  const v = parseFloat($(id).value);
+  return Number.isFinite(v) ? v : 0;
+}
+
+function readInputs() {
+  return {
+    dev: {
+      eng: num("devEng"), proto: num("devProto"), cert: num("devCert"),
+      tooling: num("devTooling"), marketing: num("devMarketing")
+    },
+    varUnit: {
+      material: num("varMaterial"), labor: num("varLabor"), assembly: num("varAssembly"),
+      packaging: num("varPackaging"), logistics: num("varLogistics"), other: num("varOther")
+    },
+    fixed: {
+      personnel: num("fixPersonnel"), rent: num("fixRent"), depreciation: num("fixDepreciation"),
+      admin: num("fixAdmin"), marketing: num("fixMarketing"), other: num("fixOther")
+    },
+    price: num("price"),
+    volume1: num("volume1"),
+    growthPct: num("growth"),
+    priceDriftPct: num("priceDrift"),
+    costInflationPct: num("costInflation"),
+    years: Math.max(1, Math.min(15, Math.round(num("years"))))
+  };
+}
+
+function compute(inp) {
+  const oneTime = Object.values(inp.dev).reduce((a, b) => a + b, 0);
+  const varUnit = Object.values(inp.varUnit).reduce((a, b) => a + b, 0);
+  const fixedYear = Object.values(inp.fixed).reduce((a, b) => a + b, 0);
+  const fixedCash = fixedYear - inp.fixed.depreciation;
+
+  const dbUnit = inp.price - varUnit;
+  const dbMargin = inp.price > 0 ? dbUnit / inp.price : 0;
+
+  const bepUnits = dbUnit > 0 ? fixedYear / dbUnit : Infinity;
+  const bepRevenue = Number.isFinite(bepUnits) ? bepUnits * inp.price : Infinity;
+  const bepUnitsCash = dbUnit > 0 ? fixedCash / dbUnit : Infinity;
+
+  const g = 1 + inp.growthPct / 100;
+  const pd = 1 + inp.priceDriftPct / 100;
+  const ci = 1 + inp.costInflationPct / 100;
+
+  const yearRows = [];
+  let cumulative = -oneTime;
+  let paybackYears = null;
+
+  for (let y = 1; y <= inp.years; y++) {
+    const volume = inp.volume1 * Math.pow(g, y - 1);
+    const price = inp.price * Math.pow(pd, y - 1);
+    const varY = varUnit * Math.pow(ci, y - 1);
+    const revenue = volume * price;
+    const variableCosts = volume * varY;
+    const db = revenue - variableCosts;
+    const ebit = db - fixedYear;
+    const cash = ebit + inp.fixed.depreciation;
+    const startCum = cumulative;
+    cumulative += cash;
+
+    if (paybackYears === null && cumulative >= 0) {
+      const need = -startCum;
+      paybackYears = (y - 1) + (cash > 0 ? Math.min(1, need / cash) : 0);
+    }
+
+    yearRows.push({
+      year: y, volume, price, varY, revenue, variableCosts, db,
+      fixed: fixedYear, ebit, cash, cumulative,
+      bepUnitsYear: price - varY > 0 ? fixedYear / (price - varY) : Infinity
+    });
+  }
+
+  const result1 = yearRows[0];
+  const totalUnitsToPayback = oneTime > 0 && dbUnit > 0
+    ? oneTime / dbUnit + (bepUnitsCash || 0)
+    : Infinity;
+
+  return {
+    oneTime, varUnit, fixedYear, fixedCash, dbUnit, dbMargin,
+    bepUnits, bepRevenue, bepUnitsCash, paybackYears, yearRows,
+    result1, totalUnitsToPayback
+  };
+}
+
+function kpiCard(label, value, hint, cls) {
+  return `<div class="kpi ${cls || ""}">
+    <div class="label">${label}</div>
+    <div class="value">${value}</div>
+    ${hint ? `<div class="hint">${hint}</div>` : ""}
+  </div>`;
+}
+
+function renderKpis(c) {
+  const r1 = c.result1;
+  const payback = c.paybackYears !== null ? `${n1.format(c.paybackYears)} Jahre` : "nicht im Horizont";
+  const ebit1Cls = r1.ebit >= 0 ? "pos" : "neg";
+  const cumEnd = c.yearRows[c.yearRows.length - 1].cumulative;
+  const cumCls = cumEnd >= 0 ? "pos" : "neg";
+
+  $("kpis").innerHTML = [
+    kpiCard("Deckungsbeitrag / Stück", eur2.format(c.dbUnit), `DB-Marge: ${(c.dbMargin * 100).toFixed(1)} % vom Preis`, c.dbUnit > 0 ? "pos" : "neg"),
+    kpiCard("Break-Even-Menge (Stück/Jahr)", Number.isFinite(c.bepUnits) ? n.format(c.bepUnits) : "–", `bei Fixkosten ${eur.format(c.fixedYear)}/Jahr`, "warn"),
+    kpiCard("Break-Even-Umsatz", Number.isFinite(c.bepRevenue) ? eur.format(c.bepRevenue) : "\u2013", "netto pro Jahr", "warn"),
+    kpiCard("Cash-Break-Even", Number.isFinite(c.bepUnitsCash) ? n.format(c.bepUnitsCash) + " Stk." : "–", "Fixkosten ohne Abschreibungen", "warn"),
+    kpiCard("Amortisation Entwicklung", payback, `einmalig ${eur.format(c.oneTime)}`, c.paybackYears !== null ? "pos" : "neg"),
+    kpiCard("Stück bis Amortisation", Number.isFinite(c.totalUnitsToPayback) ? n.format(c.totalUnitsToPayback) : "–", "kumuliert inkl. Fixkosten-DEK", ""),
+    kpiCard("Ergebnis Jahr 1 (EBIT)", eur.format(r1.ebit), `bei ${n.format(r1.volume)} Stück Absatz`, ebit1Cls),
+    kpiCard("Kumulierter Cashflow", eur.format(cumEnd), `Ende Jahr ${c.yearRows.length}`, cumCls)
+  ].join("");
+}
+
+function renderYearsTable(c) {
+  let html = `<thead><tr>
+    <th>Jahr</th><th>Absatz</th><th>Preis</th><th>Umsatz</th><th>Var. Kosten</th>
+    <th>DB</th><th>Fixkosten</th><th>EBIT</th><th>Cashflow</th><th>Kumuliert</th><th>BEP Stück</th>
+  </tr></thead><tbody>`;
+  for (const r of c.yearRows) {
+    const ebitCls = r.ebit >= 0 ? "pos" : "neg";
+    const cumCls = r.cumulative >= 0 ? "pos" : "neg";
+    const bepTxt = Number.isFinite(r.bepUnitsYear) ? n.format(r.bepUnitsYear) : "–";
+    html += `<tr${r.year === 1 ? ' class="highlight"' : ""}>
+      <td>${r.year}</td>
+      <td>${n.format(r.volume)}</td>
+      <td>${eur2.format(r.price)}</td>
+      <td>${eur.format(r.revenue)}</td>
+      <td>${eur.format(r.variableCosts)}</td>
+      <td>${eur.format(r.db)}</td>
+      <td>${eur.format(r.fixed)}</td>
+      <td class="${ebitCls}">${eur.format(r.ebit)}</td>
+      <td>${eur.format(r.cash)}</td>
+      <td class="${cumCls}">${eur.format(r.cumulative)}</td>
+      <td>${bepTxt}</td>
+    </tr>`;
+  }
+  html += "</tbody>";
+  $("tableYears").innerHTML = html;
+}
+
+function renderSensitivity(c, inp) {
+  const priceSteps = [-0.10, -0.05, 0, 0.05, 0.10];
+  const costSteps = [-0.10, 0, 0.05, 0.10];
+  let html = "<thead><tr><th>Var. Kosten \\ Preis</th>";
+  for (const p of priceSteps) {
+    html += `<th>${p === 0 ? "Plan" : (p > 0 ? "+" : "") + Math.round(p * 100) + " %"}</th>`;
+  }
+  html += "</tr></thead><tbody>";
+  for (const cs of costSteps) {
+    html += `<tr><td>${cs === 0 ? "Plan" : (cs > 0 ? "+" : "") + Math.round(cs * 100) + " %"}</td>`;
+    for (const ps of priceSteps) {
+      const db = inp.price * (1 + ps) - c.varUnit * (1 + cs);
+      const bep = db > 0 ? c.fixedYear / db : Infinity;
+      const cls = Number.isFinite(bep) && inp.volume1 >= bep ? "pos" : "neg";
+      html += `<td class="${cls}">${Number.isFinite(bep) ? n.format(bep) : "∞"}</td>`;
+    }
+    html += "</tr>";
+  }
+  html += "</tbody>";
+  $("tableSens").innerHTML = html;
+}
+
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: rect.width, h: rect.height };
+}
+
+function niceMax(v) {
+  if (!Number.isFinite(v) || v <= 0) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  return Math.ceil(v / mag) * mag;
+}
+
+function drawBEChart(c, inp) {
+  const canvas = $("chartBE");
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+
+  const padL = 70, padR = 20, padT = 20, padB = 40;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+
+  const dbUnit = Math.max(c.dbUnit, 0.01);
+  const bep = Number.isFinite(c.bepUnits) ? c.bepUnits : inp.volume1 * 2;
+  const xMax = niceMax(Math.max(inp.volume1, bep) * 1.4);
+  const yMax = niceMax(Math.max(inp.price * xMax, (c.fixedYear + c.varUnit * xMax)) * 1.05);
+
+  const X = (q) => padL + (q / xMax) * plotW;
+  const Y = (v) => padT + plotH - (v / yMax) * plotH;
+
+  ctx.font = "11px sans-serif";
+  ctx.fillStyle = "#93a0b8";
+  ctx.strokeStyle = "#2a3550";
+  ctx.lineWidth = 1;
+
+  for (let i = 0; i <= 5; i++) {
+    const v = (yMax / 5) * i;
+    const y = Y(v);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(w - padR, y);
+    ctx.stroke();
+    ctx.textAlign = "right";
+    ctx.fillText(v >= 1000 ? (v / 1000).toFixed(v >= 100000 ? 0 : 0) + " k€" : Math.round(v) + " €", padL - 8, y + 4);
+  }
+  for (let i = 0; i <= 5; i++) {
+    const q = (xMax / 5) * i;
+    ctx.textAlign = "center";
+    ctx.fillText(n.format(q), X(q), h - 18);
+  }
+
+  const line = (fn, color, width) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width || 2;
+    ctx.beginPath();
+    for (let i = 0; i <= 100; i++) {
+      const q = (xMax * i) / 100;
+      const v = fn(q);
+      const x = X(q), y = Y(Math.min(v, yMax));
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  };
+
+  line((q) => inp.price * q, "#2fbf71");
+  line((q) => c.fixedYear + c.varUnit * q, "#e5484d");
+  line((q) => c.varUnit * q, "#f5a524", 1.5);
+
+  if (Number.isFinite(c.bepUnits)) {
+    const bx = X(c.bepUnits), by = Y(c.bepRevenue);
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = "#e8edf7";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(bx, padT + plotH);
+    ctx.lineTo(bx, by);
+    ctx.lineTo(padL, by);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#e8edf7";
+    ctx.beginPath();
+    ctx.arc(bx, by, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#e8edf7";
+    ctx.fillText(`BEP: ${n.format(c.bepUnits)} Stk. / ${eur.format(c.bepRevenue)}`, Math.min(bx + 10, w - padR - 180), Math.max(by - 10, padT + 12));
+  }
+
+  const legend = [
+    ["Erlöse", "#2fbf71"],
+    ["Gesamtkosten (fix + variabel)", "#e5484d"],
+    ["Variable Kosten", "#f5a524"]
+  ];
+  let lx = padL;
+  legend.forEach(([label, color]) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(lx, 4, 12, 3);
+    ctx.fillStyle = "#93a0b8";
+    ctx.textAlign = "left";
+    ctx.fillText(label, lx + 16, 10);
+    lx += ctx.measureText(label).width + 40;
+  });
+}
+
+function drawCashChart(c) {
+  const canvas = $("chartCash");
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+
+  const padL = 70, padR = 20, padT = 20, padB = 40;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const rows = c.yearRows;
+  const nY = rows.length;
+
+  const values = rows.flatMap((r) => [r.cumulative, r.cash, 0]);
+  const vMax = niceMax(Math.max(...values, 1));
+  const vMin = Math.min(0, Math.min(...values));
+  const vAbsMax = Math.max(vMax, Math.abs(vMin));
+  const Y = (v) => padT + plotH - ((v + vAbsMax) / (2 * vAbsMax)) * plotH;
+  const zeroY = Y(0);
+
+  ctx.font = "11px sans-serif";
+  for (let i = -2; i <= 2; i++) {
+    const v = (vAbsMax / 2) * i;
+    const y = Y(v);
+    ctx.strokeStyle = "#2a3550";
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(w - padR, y);
+    ctx.stroke();
+    ctx.fillStyle = "#93a0b8";
+    ctx.textAlign = "right";
+    const av = Math.abs(v);
+    ctx.fillText((v < 0 ? "−" : "") + (av >= 1000 ? (av / 1000) + " k€" : av + " €"), padL - 8, y + 4);
+  }
+
+  const slot = plotW / nY;
+  const barW = Math.min(40, slot * 0.4);
+  rows.forEach((r, i) => {
+    const cx = padL + slot * (i + 0.5);
+    ctx.fillStyle = r.cash >= 0 ? "rgba(79,140,255,.55)" : "rgba(229,72,77,.55)";
+    const y0 = Y(0), y1 = Y(r.cash);
+    ctx.fillRect(cx - barW / 2, Math.min(y0, y1), barW, Math.abs(y1 - y0));
+
+    ctx.fillStyle = r.cumulative >= 0 ? "#2fbf71" : "#e5484d";
+    ctx.beginPath();
+    ctx.arc(cx + barW / 2 + 10, Y(r.cumulative), 4, 0, Math.PI * 2);
+    ctx.fill();
+    if (i > 0) {
+      const prev = rows[i - 1];
+      ctx.strokeStyle = r.cumulative >= 0 ? "#2fbf71" : "#e5484d";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(padL + slot * (i - 0.5) + barW / 2 + 10, Y(prev.cumulative));
+      ctx.lineTo(cx + barW / 2 + 10, Y(r.cumulative));
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#93a0b8";
+    ctx.textAlign = "center";
+    ctx.fillText("J" + r.year, cx, h - 18);
+  });
+
+  ctx.fillStyle = "#93a0b8";
+  ctx.textAlign = "left";
+  ctx.fillText("Balken: Jahres-Cashflow · Punkte: kumulierter Cashflow (inkl. Entwicklungskosten als Startwert)", padL, 10);
+}
+
+function render() {
+  const inp = readInputs();
+  const c = compute(inp);
+
+  $("sumDev").textContent = eur.format(c.oneTime);
+  $("sumVar").textContent = eur2.format(c.varUnit);
+  $("sumFix").textContent = eur.format(c.fixedYear);
+
+  const warn = $("warning");
+  if (c.dbUnit <= 0) {
+    warn.style.display = "block";
+    warn.textContent = "Achtung: Der Verkaufspreis deckt die variablen Stückkosten nicht ab (negativer Deckungsbeitrag). Jedes verkaufte Stück verliert Geld – ein Break-Even ist so nicht erreichbar.";
+  } else if (c.paybackYears === null) {
+    warn.style.display = "block";
+    warn.textContent = `Hinweis: Innerhalb des Planungshorizonts (${inp.years} Jahre) werden die Entwicklungskosten von ${eur.format(c.oneTime)} nicht amortisiert. Horizont erhöhen, Preis anheben, Stückkosten senken oder Absatz steigern.`;
+  } else {
+    warn.style.display = "none";
+  }
+
+  renderKpis(c);
+  renderYearsTable(c);
+  renderSensitivity(c, inp);
+  drawBEChart(c, inp);
+  drawCashChart(c);
+}
+
+function exportCsv() {
+  const inp = readInputs();
+  const c = compute(inp);
+  const rows = [
+    ["Break-Even-Rechner Produktentwicklung"],
+    [],
+    ["Einmalige Entwicklungskosten", String(c.oneTime)],
+    ["Variable Stückkosten", c.varUnit],
+    ["Fixe Kosten pro Jahr", c.fixedYear],
+    ["Verkaufspreis netto", inp.price],
+    ["Deckungsbeitrag/Stück", c.dbUnit],
+    ["DB-Marge", (c.dbMargin * 100).toFixed(1) + "%"],
+    ["Break-Even-Menge (Stück/Jahr)", Number.isFinite(c.bepUnits) ? Math.round(c.bepUnits) : "n/a"],
+    ["Break-Even-Umsatz", Number.isFinite(c.bepRevenue) ? Math.round(c.bepRevenue) : "n/a"],
+    ["Amortisation (Jahre)", c.paybackYears !== null ? c.paybackYears.toFixed(1) : "n/a"],
+    [],
+    ["Jahr", "Absatz", "Preis", "Umsatz", "Variable Kosten", "Deckungsbeitrag", "Fixkosten", "EBIT", "Cashflow", "Kumuliert", "BEP Stück"]
+  ];
+  for (const r of c.yearRows) {
+    rows.push([
+      r.year, Math.round(r.volume), r.price.toFixed(2), Math.round(r.revenue),
+      Math.round(r.variableCosts), Math.round(r.db), Math.round(r.fixed),
+      Math.round(r.ebit), Math.round(r.cash), Math.round(r.cumulative),
+      Number.isFinite(r.bepUnitsYear) ? Math.round(r.bepUnitsYear) : "n/a"
+    ]);
+  }
+  const csv = rows.map((r) => r.join(";")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "break-even-plan.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+document.querySelectorAll("input").forEach((el) => el.addEventListener("input", render));
+window.addEventListener("resize", render);
+$("btnExport").addEventListener("click", exportCsv);
+$("btnPrint").addEventListener("click", () => window.print());
+render();
+</script>
+</body>
+</html>
